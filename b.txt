@@ -1,0 +1,321 @@
+1.Simulate a three nodes point-to-point network with duplex links between them. Set the
+queue size and vary the bandwidth and find the number of packets dropped.
+Dup.tcl
+#Create a simulator object
+set ns [new Simulator]
+#Open a trace file
+set tf [open p1.tr w]
+$ns trace-all $tf
+#Open a nam trace file
+set nm [open p1.nam w]
+$ns namtrace-all $nm
+#Creating nodes
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+#color the nodes
+$ns color 1 "red"
+$ns color 2 "green"
+#Label the nodes
+$n0 label "source"
+$n1 label "source"
+$n2 label "destination"
+#Create links, vary bandwidth to check the number of packets dropped.
+$ns duplex-link $n0 $n1 10mb 300ms DropTail
+$ns duplex-link $n1 $n2 1mb 300ms DropTail
+#Limiting the queue to only 10 packets
+$ns set queue-limit $n0 $n1 10
+$ns set queue-limit $n1 $n2 5
+#Setup a UDP connection
+set udp0 [new Agent/UDP]
+$ns attach-agent $n0 $udp0
+#Create a CBR traffic source and attach it to udp0
+set cbr1 [new Application/Traffic/CBR]
+
+$cbr1 set packetSize_ 500
+$cbr1 set interval_ 0.005
+$cbr1 attach-agent $udp0
+#Create a UDP agent and attach it to node n1
+set udp1 [new Agent/UDP]
+$ns attach-agent $n1 $udp1
+#Create a CBR traffic source and attach it to udp1
+set cbr2 [new Application/Traffic/CBR]
+$cbr2 set packetSize_ 500
+$cbr2 set interval_ 0.005
+$cbr2 attach-agent $udp1
+#Create a Null agent (a traffic sink) and attach it to node n3
+set null [new Agent/Null]
+$ns attach-agent $n2 $null
+#Set udp0 packets to red color and udp1 packets to blue color
+$udp0 set class_ 1
+$udp1 set class_ 2
+#Connect the traffic sources with the traffic sink
+$ns connect $udp0 $null
+$ns connect $udp1 $null
+#Define a 'finish' procedure
+proc finish {} {
+global ns tf nm
+exec nam p1.nam &
+$ns flush-trace
+close $tf
+close $nm
+exit 0
+}
+#Schedule events for the CBR agents
+$ns at 0.1 "$cbr1 start"
+$ns at 0.1 "$cbr2 start"
+#Call the finish procedure after 10 seconds of simulation time
+$ns at 10.0 "finish"
+#Run the simulation [To run: ns Dup.tcl]
+
+$ns run
+Dup.awk
+BEGIN {
+count=0;
+}
+{
+if($1=="d")
+count++;
+}
+END {
+printf("The total number of packets dropped due to congestion: %d\n\n",count);
+}
+[To run: awk -f Dup.awk p1.tr]
+Output:
+The total number of packets dropped due to congestion: 1392
+
+
+
+
+2. Simulate the network with five nodes n0, n1, n2, n3, n4, forming a star topology. The
+node n4 is at the center. Node n0 is a TCP source, which transmits packets to node n3 (a
+TCP sink) through the node n4. Node n1 is another traffic source, and sends UDP
+packets to node n2 through n4. The duration of the simulation time is 10 seconds.
+//prg.tcl
+set ns [new Simulator]
+set nf [open star.nam w]
+$ns namtrace-all $nf
+set tf [open star.tr w]
+$ns trace-all $tf
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+$n0 label "Tcp Source"
+$n3 label "Tcp Destination"
+$n1 label "Udp Source"
+$n2 label "Udp Destination"
+$n0 shape square
+$n3 shape square
+
+$n4 shape circle
+$n1 shape hexagon
+$n2 shape hexagon
+$n0 color "green"
+$n3 color "red"
+$n1 color "green"
+$n2 color "red"
+$n4 color "black"
+$ns color 1 "red"
+$ns color 2 "blue"
+$ns duplex-link $n0 $n4 1Mb 10ms DropTail
+$ns duplex-link $n1 $n4 1Mb 10ms DropTail
+$ns duplex-link $n2 $n4 1Mb 10ms DropTail
+$ns duplex-link $n3 $n4 1Mb 10ms DropTail
+set tcp0 [new Agent/TCP]
+$ns attach-agent $n0 $tcp0
+set sink0 [new Agent/TCPSink]
+$ns attach-agent $n3 $sink0
+set udp0 [new Agent/UDP]
+$ns attach-agent $n1 $udp0
+
+set null0 [new Agent/Null]
+$ns attach-agent $n1 $null0
+$udp0 set class_ 1
+$tcp0 set class_ 2
+$ns connect $tcp0 $sink0
+$ns connect $udp0 $null0
+set ftp0 [new Application/FTP]
+$ftp0 attach-agent $tcp0
+set cbr0 [new Application/Traffic/CBR]
+$cbr0 attach-agent $udp0
+$cbr0 set PacketSize_ 500
+$cbr0 set interval_ 0.01
+
+$ns at 0.5 "$ftp0 start"
+$ns at 9.5 "$ftp0 stop"
+$ns at 1.0 "$cbr0 start"
+$ns at 9.9 "$cbr0 stop"
+proc finish {} {
+global ns nf tf
+close $tf
+close $nf
+exec nam star.nam & }
+$ns at 10.0 "finish"
+$ns run\
+
+
+
+3. Simulate to study transmission of packets over Ethernet LAN and determine the
+number of packets drop destination.
+set ns [ new Simulator ]
+set tr1 [ open b2.tr w ]
+$ns trace-all $tr1
+set nm1 [open b2.nam w]
+$ns namtrace-all $nm1
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+set n5 [$ns node]
+$ns color 1 "blue"
+$ns color 2 "red"
+$ns duplex-link $n0 $n2 1Mb 200ms DropTail
+$ns duplex-link $n1 $n2 1Mb 100ms DropTail
+$ns duplex-link $n2 $n3 0.6Mb 100ms DropTail
+$ns duplex-link-op $n0 $n2 orient right-down
+$ns duplex-link-op $n1 $n2 orient right-up
+$ns duplex-link-op $n2 $n3 orient right
+$n0 label "Source TCP1"
+$n4 label "DestTCP1"
+$n1 label "SourceTCP2"
+$n5 label "DestTCP2"
+
+set lan [$ns newLan "$n3 $n4 $n5" 0.6Mb 40ms LL Queue/DropTail Mac/802_3 Channel]
+$ns set queue-limit $n2 $n3 10
+$ns duplex-link-op $n2 $n3 queuePos 10.0
+set tcp1 [new Agent/TCP]
+$ns attach-agent $n0 $tcp1
+set sink1 [new Agent/TCPSink]
+$ns attach-agent $n4 $sink1
+set ftp1 [new Application/FTP]
+$ftp1 attach-agent $tcp1
+$ftp1 set packetSize_ 500
+$ftp1 set interval_ 0.-005
+$ns connect $tcp1 $sink1
+set tcp2 [new Agent/TCP]
+$ns attach-agent $n1 $tcp2
+set sink2 [new Agent/TCPSink]
+$ns attach-agent $n5 $sink2
+set ftp2 [new Application/FTP]
+$ftp2 attach-agent $tcp2
+$ftp2 set packetSize_ 500
+$ftp2 set interval_ 0.001
+$ns connect $tcp2 $sink2
+$ns at 0.5 "$ftp1 start"
+$ns at 4.9 "$ftp1 stop"
+$ns at 1.0 "$ftp2 start"
+$ns at 4.9 "$ftp2 stop"
+$tcp1 set class_ 1
+$tcp2 set class_ 2
+proc finish {} {
+global ns tr1 nm1
+#ns flush-trace
+exec nam b2.nam &
+close $tr1
+close $nm1
+
+exit 0
+}
+$ns at 5.0 "finish"
+$ns run
+
+
+
+5. Simulate the different types of internet traffic such as FTP and TELNET over a wired
+network and analyze the packet drop and packet delivery ratio in the network.
+//ftp1.tcl
+set ns [new Simulator]
+set tf [open ftp.tr w]
+$ns trace-all $tf
+set nm [open ftp.nam w]
+$ns namtrace-all $nm
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+set n3 [$ns node]
+set n4 [$ns node]
+$ns color 1 "red"
+$ns color 2 "green"
+$ns duplex-link $n0 $n2 0.3Mb 10ms DropTail
+$ns duplex-link $n1 $n2 0.3Mb 10ms DropTail
+$ns duplex-link $n2 $n3 0.3Mb 10ms DropTail
+$ns duplex-link $n2 $n4 0.3Mb 10ms DropTail
+$ns set queue-linit $n0 $n2 5
+$ns set queue-limit $n1 $n2 5
+$ns set queue-limit $n2 $n3 5
+$ns set queue-limit $n2 $n4 5
+set tcp1 [new Agent/TCP]
+$ns attach-agent $n0 $tcp1
+set sink1 [new Agent/TCPSink]
+$ns attach-agent $n3 $sink1
+
+set ftp1 [new Application/FTP]
+$ftp1 attach-agent $tcp1
+$ftp1 set packetSize_ 500
+$ftp1 set interval_ 0.005
+$ns connect $tcp1 $sink1
+set tcp2 [new Agent/TCP]
+$ns attach-agent $n1 $tcp2
+set sink2 [new Agent/TCPSink]
+$ns attach-agent $n3 $sink2
+set telneto [new Application/Telnet]
+$telneto attach-agent $tcp2
+$telneto set packetSize_ 500
+$telneto set interval_ 0.005
+$ns connect $tcp2 $sink2
+set tcp3 [new Agent/TCP]
+$ns attach-agent $n4 $tcp3
+set sink3 [new Agent/TCPSink]
+$ns attach-agent $n3 $sink3
+set ftp2 [new Application/FTP]
+$ftp2 attach-agent $tcp3
+$ftp2 set packetSize_ 500
+$ftp2 set interval_ 0.005
+$ns connect $tcp3 $sink3
+$tcp1 set class_ 1
+$tcp2 set class_ 2
+proc finish {} {
+global ns tf nm
+$ns flush-trace
+close $tf
+close $nm
+exec nam ftp.nam &
+exit 0
+}
+
+$ns at 0.1 "$ftp1 start"
+$ns at 0.1 "$ftp2 start"
+$ns at 0.1 "$telneto start"
+$ns at 5.0 "finish"
+$ns run
+//ftp.awk
+BEGIN{
+drop=0;
+total=0;
+rec=0;
+ratio=0;
+}
+{
+if($1 == "d")
+drop++;
+if($1=="+")
+sent++;
+if($1=="r")
+rec++;
+total=rec+drop;
+ratio=(rec/sent)*100;
+}
+END{
+printf"\nTotal number of packet sent from source:%d", total;
+printf"\nTotal number of packlet received at destination:%d", rec;
+printf"\nTotal number of packet dropped:%d", drop;
+printf"\nPacket delivery ratio:%f\n", ratio;
+}
+Output:
+Total number of packet sent from source:740
+Total number of packlet received at destination:732
+Total number of packet dropped:8
+Packet delivery ratio:95.811518

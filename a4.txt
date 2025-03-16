@@ -1,0 +1,74 @@
+//server.c
+
+
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+int main() {
+    int serverSocket, clientSocket, file;
+    char buffer[1024];
+    struct sockaddr_in serverAddr;
+
+    serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(5555);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, 1);
+
+    clientSocket = accept(serverSocket, NULL, NULL);
+
+    char fileName[50];
+    recv(clientSocket, fileName, sizeof(fileName), 0);
+
+    file = open(fileName, O_RDONLY);
+    if (file < 0) {
+        send(clientSocket, "File not found\n", 15, 0);
+    } else {
+        int bytesRead;
+        while ((bytesRead = read(file, buffer, sizeof(buffer))) > 0) {
+            send(clientSocket, buffer, bytesRead, 0);
+        }
+        close(file);
+    }
+
+    close(clientSocket);
+    close(serverSocket);
+    return 0;
+}
+
+
+//client.c
+
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+int main() {
+    int clientSocket;
+    char fileName[50], buffer[1024];
+    struct sockaddr_in serverAddr;
+
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(5555);
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+
+    printf("Enter file name: ");
+    scanf("%s", fileName);
+    send(clientSocket, fileName, sizeof(fileName), 0);
+
+    while (recv(clientSocket, buffer, sizeof(buffer), 0) > 0) {
+        printf("%s", buffer);
+    }
+
+    close(clientSocket);
+    return 0;
+}

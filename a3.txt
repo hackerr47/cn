@@ -1,0 +1,55 @@
+#include <stdio.h>
+
+int main() {
+    int n, i, bucket_size, bucket_rate;
+    int p[32];
+
+
+    printf("Enter number of packets: ");
+    scanf("%d", &n);
+
+
+    printf("Enter size of each packet:\n");
+    for (i = 0; i < n; i++) {
+        scanf("%d", &p[i]);
+    }
+
+    printf("Enter Bucket Size: ");
+    scanf("%d", &bucket_size);
+    printf("Enter Bucket Rate: ");
+    scanf("%d", &bucket_rate);
+
+    printf("Clock/s\tPacketSize\tAccept\tSent\tRemaining\n");
+
+    int accept = 0, sent = 0, remaining = 0;
+
+    // Step 5: Process each packet
+    for (i = 0; i < n; i++) {
+        if (p[i] <= bucket_size) {
+            if (remaining + p[i] <= bucket_size) {
+                accept = p[i]; // Accept full packet
+                remaining += p[i];
+            } else {
+                accept = bucket_size - remaining;
+                remaining = bucket_size;
+            }
+        } else {
+            accept = 0; 
+        }
+
+        sent = (remaining >= bucket_rate) ? bucket_rate : remaining;
+        remaining -= sent;
+
+        // Step 6: Print table row
+        printf("%d\t\t%d\t\t%d\t\t%d\t\t%d\n", i + 1, p[i], accept, sent, remaining);
+    }
+
+    while (remaining > 0) {
+        i++;
+        sent = (remaining >= bucket_rate) ? bucket_rate : remaining;
+        remaining -= sent;
+        printf("%d\t\t0\t\t0\t\t%d\t\t%d\n", i, sent, remaining);
+    }
+
+    return 0;
+}
